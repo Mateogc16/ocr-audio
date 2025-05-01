@@ -1,8 +1,7 @@
-import streamlit as st
 import os
 import time
 import glob
-import os
+import streamlit as st
 import cv2
 import numpy as np
 import pytesseract
@@ -10,178 +9,141 @@ from PIL import Image
 from gtts import gTTS
 from googletrans import Translator
 
+# ----------------------------------------
+# Estética Mágica Unificada: Azul y Morado
+# ----------------------------------------
+magic_theme = """
+<style>
+body {
+    background-color: #0b032d;
+    color: #d0caff;
+    font-family: 'Georgia', serif;
+}
+h1, h2, h3 {
+    color: #cba6f7;
+    text-shadow: 0 0 5px #b892ff, 0 0 10px #8f43f8;
+}
+.stButton>button {
+    background: linear-gradient(145deg, #6a00ff, #9c4dff);
+    border: 1px solid #d6b3ff;
+    color: #ffffff;
+    border-radius: 10px;
+    padding: 0.6em 1.2em;
+    font-weight: bold;
+    box-shadow: 0 0 10px #a463ff;
+}
+.stSelectbox, .stTextInput, .stTextArea, .css-1offfwp {
+    background-color: #150034 !important;
+    color: #e0dfff !important;
+    border: 1px solid #4b0082 !important;
+}
+.sidebar .sidebar-content {
+    background-color: #120a3b;
+    color: #dcd6f7;
+}
+.stCameraInput > div > video,
+.stCameraInput > div > canvas {
+    border: 5px solid #6a00ff;
+    border-radius: 12px;
+    box-shadow: 0 0 15px #9c4dff;
+}
+hr {
+    border-top: 1px solid #8854d0;
+}
+</style>
+"""
+st.markdown(magic_theme, unsafe_allow_html=True)
 
-text=" "
+# ----------------------------------------
+# Título Principal
+# ----------------------------------------
+st.title("🔮 Grimorio y Espejo Arcano")
+st.subheader("Fusiona OCR místico y traducción de conjuros")
 
-def text_to_speech(input_language, output_language, text, tld):
-    translation = translator.translate(text, src=input_language, dest=output_language)
-    trans_text = translation.text
-    tts = gTTS(trans_text, lang=output_language, tld=tld, slow=False)
-    try:
-        my_file_name = text[0:20]
-    except:
-        my_file_name = "audio"
-    tts.save(f"temp/{my_file_name}.mp3")
-    return my_file_name, trans_text
+# ----------------------------------------
+# Inicializar Sistema
+# ----------------------------------------
+translator = Translator()
 
+# Limpiar archivos antiguos
+def remove_files(days=7):
+    files = glob.glob("temp/*.mp3")
+    now = time.time()
+    for f in files:
+        if os.stat(f).st_mtime < now - days * 86400:
+            os.remove(f)
+remove_files()
 
+# ----------------------------------------
+# Sección de OCR: Espejo Arcano
+# ----------------------------------------
+st.markdown("---")
+st.header("📜 Espejo Arcano: Reconocimiento Óptico (OCR)")
+st.write("Muestra tu texto al espejo para que revele su secreto.")
 
+use_camera = st.checkbox("Usar Cámara para OCR")
+if use_camera:
+    img_buffer = st.camera_input("Acércate al espejo y muestra el texto")
+else:
+    img_buffer = None
+    uploaded = st.file_uploader("Cargar imagen al espejo:", type=["png","jpg","jpeg"])
+    if uploaded:
+        img_buffer = uploaded
+        st.image(uploaded, caption="Imagen cargada al espejo", use_column_width=True)
 
-def remove_files(n):
-    mp3_files = glob.glob("temp/*mp3")
-    if len(mp3_files) != 0:
-        now = time.time()
-        n_days = n * 86400
-        for f in mp3_files:
-            if os.stat(f).st_mtime < now - n_days:
-                os.remove(f)
-                print("Deleted ", f)
+ocr_text = ""
+if img_buffer is not None:
+    data = img_buffer.getvalue()
+    img = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
+    ocr_mode = st.radio("Filtro del reflejo:", ["Normal", "Inversión Mística"], index=0)
+    if ocr_mode == "Inversión Mística":
+        img = cv2.bitwise_not(img)
+    rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    ocr_text = pytesseract.image_to_string(rgb)
+    st.subheader("✨ Texto revelado por el espejo:")
+    st.code(ocr_text)
+else:
+    st.info("🔍 Selecciona Cámara o sube una imagen para iniciar OCR.")
 
+# ----------------------------------------
+# Sección de Traducción: Conjuro Parlante
+# ----------------------------------------
+st.markdown("---")
+st.header("🗣️ Conjuro Parlante: Texto a Voz y Traducción")
 
-remove_files(7)
-  
+input_text = st.text_area("Texto fuente:", value=ocr_text)
 
+col1, col2 = st.columns(2)
+with col1:
+    in_sel = st.selectbox("Lengua de origen", ("Inglés","Español","Bengali","Coreano","Mandarín","Japonés"))
+with col2:
+    out_sel = st.selectbox("Lengua de destino", ("Inglés","Español","Bengali","Coreano","Mandarín","Japonés"))
 
+accent = st.selectbox(
+    "Acento para el conjuro (solo inglés):",
+    ["Defecto","Reino Unido","Estados Unidos","Canadá","Australia","India","Irlanda","Sudáfrica"],
+    index=0
+)
 
-st.title("Reconocimiento Óptico de Caracteres")
-st.subheader("Elige la fuente de la imágen, esta puede venir de la cámara o cargando un archivo")
+tld_map = {
+    "Defecto":"com","Reino Unido":"co.uk","Estados Unidos":"com",
+    "Canadá":"ca","Australia":"com.au","India":"co.in",
+    "Irlanda":"ie","Sudáfrica":"co.za"
+}
 
-cam_ = st.checkbox("Usar Cámara")
+lg_map = {"Inglés":"en","Español":"es","Bengali":"bn","Coreano":"ko","Mandarín":"zh-cn","Japonés":"ja"}
 
-if cam_ :
-   img_file_buffer = st.camera_input("Toma una Foto")
-else :
-   img_file_buffer = None
-   
-with st.sidebar:
-      st.subheader("Procesamiento para Cámara")
-      filtro = st.radio("Filtro para imagen con cámara",('Sí', 'No'))
+if st.button("🔊 Invocar Traducción"):  
+    in_lang = lg_map[in_sel]
+    out_lang = lg_map[out_sel]
+    tld = tld_map[accent]
+    fname, translated = text_to_speech(in_lang, out_lang, input_text, tld)
+    path = f"temp/{fname}.mp3"
+    with open(path, "rb") as f:
+        audio = f.read()
+    st.audio(audio, format="audio/mp3")
+    st.subheader("📜 Texto traducido:")
+    st.write(translated)
 
-bg_image = st.file_uploader("Cargar Imagen:", type=["png", "jpg"])
-if bg_image is not None:
-    uploaded_file=bg_image
-    st.image(uploaded_file, caption='Imagen cargada.', use_column_width=True)
-    
-    # Guardar la imagen en el sistema de archivos
-    with open(uploaded_file.name, 'wb') as f:
-        f.write(uploaded_file.read())
-    
-    st.success(f"Imagen guardada como {uploaded_file.name}")
-    img_cv = cv2.imread(f'{uploaded_file.name}')
-    img_rgb = cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB)
-    text= pytesseract.image_to_string(img_rgb)
-st.write(text)  
-    
-      
-if img_file_buffer is not None:
-    # To read image file buffer with OpenCV:
-    bytes_data = img_file_buffer.getvalue()
-    cv2_img = cv2.imdecode(np.frombuffer(bytes_data, np.uint8), cv2.IMREAD_COLOR)
-
-    
-    if filtro == 'Con Filtro':
-         cv2_img=cv2.bitwise_not(cv2_img)
-    else:
-        cv2_img= cv2_img
-          
-        
-    img_rgb = cv2.cvtColor(cv2_img, cv2.COLOR_BGR2RGB)
-    text=pytesseract.image_to_string(img_rgb) 
-    st.write(text) 
-
-with st.sidebar:
-      st.subheader("Parámetros de traducción")
-      
-      try:
-          os.mkdir("temp")
-      except:
-          pass
-      #st.title("Text to speech")
-      translator = Translator()
-      
-      #text = st.text_input("Enter text")
-      in_lang = st.selectbox(
-          "Seleccione el lenguaje de entrada",
-          ("Ingles", "Español", "Bengali", "koreano", "Mandarin", "Japones"),
-      )
-      if in_lang == "Ingles":
-          input_language = "en"
-      elif in_lang == "Español":
-          input_language = "es"
-      elif in_lang == "Bengali":
-          input_language = "bn"
-      elif in_lang == "koreano":
-          input_language = "ko"
-      elif in_lang == "Mandarin":
-          input_language = "zh-cn"
-      elif in_lang == "Japones":
-          input_language = "ja"
-      
-      out_lang = st.selectbox(
-          "Select your output language",
-          ("Ingles", "Español", "Bengali", "koreano", "Mandarin", "Japones"),
-      )
-      if out_lang == "Ingles":
-          output_language = "en"
-      elif out_lang == "Español":
-          output_language = "es"
-      elif out_lang == "Bengali":
-          output_language = "bn"
-      elif out_lang == "koreano":
-          output_language = "ko"
-      elif out_lang == "Chinese":
-          output_language = "zh-cn"
-      elif out_lang == "Japones":
-          output_language = "ja"
-      
-      english_accent = st.selectbox(
-          "Seleccione el acento",
-          (
-              "Default",
-              "India",
-              "United Kingdom",
-              "United States",
-              "Canada",
-              "Australia",
-              "Ireland",
-              "South Africa",
-          ),
-      )
-      
-      if english_accent == "Default":
-          tld = "com"
-      elif english_accent == "India":
-          tld = "co.in"
-      
-      elif english_accent == "United Kingdom":
-          tld = "co.uk"
-      elif english_accent == "United States":
-          tld = "com"
-      elif english_accent == "Canada":
-          tld = "ca"
-      elif english_accent == "Australia":
-          tld = "com.au"
-      elif english_accent == "Ireland":
-          tld = "ie"
-      elif english_accent == "South Africa":
-          tld = "co.za"
-
-      display_output_text = st.checkbox("Mostrar texto")
-
-      if st.button("convert"):
-          result, output_text = text_to_speech(input_language, output_language, text, tld)
-          audio_file = open(f"temp/{result}.mp3", "rb")
-          audio_bytes = audio_file.read()
-          st.markdown(f"## Tu audio:")
-          st.audio(audio_bytes, format="audio/mp3", start_time=0)
-      
-          if display_output_text:
-              st.markdown(f"## Texto de salida:")
-              st.write(f" {output_text}")
-
-
-
-
- 
-    
-    
+st.markdown("---")
+st.write("&copy; 2025 GrimorioTech")
